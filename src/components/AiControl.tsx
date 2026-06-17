@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiClient } from "../lib/api-client";
 
 type ToastType = "success" | "error";
 
@@ -42,8 +43,6 @@ interface ToastState {
   message: string;
 }
 
-const API_BASE_URL = "http://localhost:3000/api/v1";
-
 const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
   month: "2-digit",
@@ -59,21 +58,7 @@ const actionLabels: Record<string, string> = {
 };
 
 async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    throw new Error("Yêu cầu không thành công");
-  }
-
-  return response.json() as Promise<T>;
+  return apiClient.request<T>(path, init);
 }
 
 function formatDateTime(value: string) {

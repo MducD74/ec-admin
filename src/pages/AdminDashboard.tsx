@@ -5,6 +5,7 @@ import ProductInventory from "../components/ProductInventory";
 import UserManagement from "../components/UserManagement";
 import VoucherManagement from "../components/VoucherManagement";
 import Pagination from "../components/Common/Pagination";
+import { apiClient } from "../lib/api-client";
 
 type ActiveTab =
   | "overview"
@@ -74,8 +75,7 @@ interface ToastState {
   message: string;
 }
 
-const API_BASE_URL = "http://localhost:3000/api/v1";
-const QUEUE_BOARD_URL = "http://localhost:3000/admin/queues";
+const QUEUE_BOARD_URL = "/admin/queues";
 
 const tabs: Array<{ id: ActiveTab; label: string }> = [
   { id: "overview", label: "Tổng quan" },
@@ -119,24 +119,6 @@ function formatDate(value: string) {
   return dateFormatter.format(new Date(value));
 }
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    throw new Error("Yêu cầu không thành công");
-  }
-
-  return response.json() as Promise<T>;
-}
-
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -157,7 +139,7 @@ function AdminDashboard() {
     setLoadingStats(true);
 
     try {
-      const response = await apiRequest<AdminStatsResponse>("/admin/stats");
+      const response = await apiClient.get<AdminStatsResponse>("/admin/stats");
       setStats(response.data);
     } catch {
       showToast("error", "Không thể tải số liệu tổng quan.");
@@ -172,7 +154,7 @@ function AdminDashboard() {
     }
 
     try {
-      const response = await apiRequest<AdminOrdersResponse>(`/admin/orders?page=${page}&limit=10`);
+      const response = await apiClient.get<AdminOrdersResponse>(`/admin/orders?page=${page}&limit=10`);
       setOrders(response.data ?? response.orders ?? []);
       setMeta(
         response.meta ??
@@ -216,10 +198,7 @@ function AdminDashboard() {
     setUpdatingOrderId(orderId);
 
     try {
-      await apiRequest(`/admin/orders/${orderId}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
+      await apiClient.put(`/admin/orders/${orderId}/status`, { status });
       showToast("success", "Đã cập nhật trạng thái đơn hàng.");
       await Promise.all([fetchOrders(false), fetchStats()]);
     } catch {

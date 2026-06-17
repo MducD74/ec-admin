@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiClient } from "../lib/api-client";
 
 interface AdminStats {
   totalRevenue: string | number;
@@ -15,8 +16,6 @@ interface AdminStats {
 interface AdminStatsResponse {
   data: AdminStats;
 }
-
-const API_BASE_URL = "http://localhost:3000/api/v1";
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
@@ -47,18 +46,7 @@ function DashboardAnalytics() {
       setError(null);
 
       try {
-        const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-        const response = await fetch(`${API_BASE_URL}/admin/stats`, {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Không thể tải dữ liệu thống kê.");
-        }
-
-        const payload = (await response.json()) as AdminStatsResponse;
+        const payload = await apiClient.get<AdminStatsResponse>("/admin/stats");
 
         if (isMounted) {
           setStats(payload.data);

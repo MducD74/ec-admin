@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Pagination from "./Common/Pagination";
+import { apiClient } from "../lib/api-client";
 
 type OrderStatus = "ALL" | "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
 type ToastType = "success" | "error";
@@ -48,8 +49,6 @@ interface ToastState {
   message: string;
 }
 
-const API_BASE_URL = "http://localhost:3000/api/v1";
-
 const statusTabs: Array<{ value: OrderStatus; label: string }> = [
   { value: "ALL", label: "Tất cả" },
   { value: "PENDING", label: "Chờ xử lý" },
@@ -96,21 +95,7 @@ function normalizeStatus(status: string) {
 }
 
 async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    throw new Error("Yêu cầu không thành công");
-  }
-
-  return response.json() as Promise<T>;
+  return apiClient.request<T>(path, init);
 }
 
 function OrderManagement() {

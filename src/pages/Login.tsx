@@ -1,12 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { apiClient } from "../lib/api-client";
 
 interface AdminLoginResponse {
   token?: string;
   message?: string;
 }
-
-const API_BASE_URL = "http://localhost:3000/api/v1";
 
 function navigateToDashboard() {
   window.history.replaceState(null, "", "/");
@@ -14,16 +13,13 @@ function navigateToDashboard() {
 }
 
 async function loginAdmin(email: string, password: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/admin-login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-  const payload = (await response.json().catch(() => ({}))) as AdminLoginResponse;
+  const payload = await apiClient.post<AdminLoginResponse>(
+    "/auth/admin-login",
+    { email, password },
+    { auth: false },
+  );
 
-  if (!response.ok || !payload.token) {
+  if (!payload.token) {
     throw new Error(payload.message ?? "Không thể đăng nhập. Vui lòng thử lại.");
   }
 

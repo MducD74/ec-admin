@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { apiClient } from "../lib/api-client";
 
 type ToastType = "success" | "error";
 
@@ -45,8 +46,6 @@ interface ToastState {
   message: string;
 }
 
-const API_BASE_URL = "http://localhost:3000/api/v1";
-
 const initialVariantForm: VariantFormState = {
   sku: "",
   attributeName: "",
@@ -62,21 +61,7 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
 });
 
 async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  });
-
-  if (!response.ok) {
-    throw new Error("Yêu cầu không thành công");
-  }
-
-  return response.json() as Promise<T>;
+  return apiClient.request<T>(path, init);
 }
 
 function formatCurrency(value: string | number) {

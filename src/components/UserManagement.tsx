@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiClient } from "../lib/api-client";
 
 type UserRole = "ADMIN" | "USER" | string;
 
@@ -24,8 +25,6 @@ interface UsersResponse {
   users?: AdminUser[];
 }
 
-const API_BASE_URL = "http://localhost:3000/api/v1";
-
 const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
   day: "2-digit",
   month: "2-digit",
@@ -33,19 +32,7 @@ const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
 });
 
 async function requestApi<T>(path: string): Promise<T> {
-  const token = localStorage.getItem("adminToken") ?? localStorage.getItem("token");
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Yêu cầu không thành công");
-  }
-
-  return response.json() as Promise<T>;
+  return apiClient.request<T>(path);
 }
 
 function getUsers(response: UsersResponse) {
