@@ -50,7 +50,7 @@ function hasValidAdminToken() {
 function redirectToLogin() {
   localStorage.removeItem("adminToken");
   localStorage.removeItem("token");
-  window.history.replaceState(null, "", "/login");
+  window.history.replaceState(null, "", "/admin/login");
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

@@ -13,7 +13,7 @@ function App() {
     return () => window.removeEventListener("popstate", updatePath);
   }, []);
 
-  if (path === "/login") {
+  if (path === "/admin/login") {
     return <Login />;
   }
 

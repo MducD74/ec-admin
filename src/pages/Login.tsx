@@ -8,7 +8,7 @@ interface AdminLoginResponse {
 }
 
 function navigateToDashboard() {
-  window.history.replaceState(null, "", "/");
+  window.history.replaceState(null, "", "/admin");
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
