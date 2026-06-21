@@ -75,7 +75,7 @@ interface ToastState {
   message: string;
 }
 
-const QUEUE_BOARD_URL = "/admin/queues";
+const QUEUE_BOARD_URL = "http://localhost:3000/admin/queues";
 
 const tabs: Array<{ id: ActiveTab; label: string }> = [
   { id: "overview", label: "Tổng quan" },
@@ -83,7 +83,7 @@ const tabs: Array<{ id: ActiveTab; label: string }> = [
   { id: "vouchers", label: "Voucher" },
   { id: "ai-control", label: "Cấu hình AI" },
   { id: "catalog", label: "Danh mục sản phẩm" },
-  { id: "inventory", label: "Tồn kho biến thể" },
+  // { id: "inventory", label: "Tồn kho biến thể" },
   { id: "users", label: "Quản lý khách hàng" },
 ];
 
