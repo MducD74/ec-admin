@@ -75,7 +75,7 @@ interface ToastState {
   message: string;
 }
 
-const QUEUE_BOARD_URL = "/api/monitor";
+const QUEUE_BOARD_URL = "/api/v1/monitor";
 
 const tabs: Array<{ id: ActiveTab; label: string }> = [
   { id: "overview", label: "Tổng quan" },
