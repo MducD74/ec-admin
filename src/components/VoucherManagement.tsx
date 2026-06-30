@@ -200,11 +200,11 @@ function VoucherManagement() {
 
       <div className="voucher-management-header">
         <div>
-          <p>Quản trị khuyến mãi</p>
-          <h2>Quản lý 50 mã giảm giá</h2>
+          {/* <p>Quản trị khuyến mãi</p>
+          <h2>Quản lý 50 mã giảm giá</h2> */}
         </div>
         <button type="button" className="voucher-management-refresh" onClick={() => void fetchVouchers()}>
-          Tải lại danh sách
+          Tải lại
         </button>
       </div>
 

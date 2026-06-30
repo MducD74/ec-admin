@@ -4,8 +4,8 @@ import CatalogManagement from "../components/CatalogManagement";
 import ProductInventory from "../components/ProductInventory";
 import UserManagement from "../components/UserManagement";
 import VoucherManagement from "../components/VoucherManagement";
-import Pagination from "../components/Common/Pagination";
 import { apiClient } from "../lib/api-client";
+import OrderManagement from "../components/OrderManagement";
 
 type ActiveTab =
   | "overview"
@@ -32,44 +32,6 @@ interface AdminStatsResponse {
   data: AdminStats;
 }
 
-interface AdminOrderItem {
-  id: number;
-  quantity: number;
-  product?: {
-    id: number;
-    name: string;
-  };
-}
-
-interface AdminOrder {
-  id: number;
-  voucherId?: number | null;
-  total: string | number;
-  status: string;
-  paymentMethod: string;
-  createdAt: string;
-  items: AdminOrderItem[];
-}
-
-interface AdminOrdersResponse {
-  data?: AdminOrder[];
-  orders?: AdminOrder[];
-  meta?: PaginationMeta;
-  pagination?: {
-    totalPages?: number;
-    page?: number;
-    limit?: number;
-    total?: number;
-  };
-}
-
-interface PaginationMeta {
-  totalItems: number;
-  totalPages: number;
-  currentPage: number;
-  limit: number;
-}
-
 interface ToastState {
   type: ToastType;
   message: string;
@@ -93,41 +55,14 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   maximumFractionDigits: 0,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const statusLabelByValue: Record<string, string> = {
-  PENDING: "Chờ xử lý",
-  PROCESSING: "Đang xử lý",
-  PAID: "Đã thanh toán",
-  SHIPPED: "Đang giao",
-  COMPLETED: "Đã giao",
-  DELIVERED: "Đã giao",
-  CANCELLED: "Đã hủy",
-};
-
 function formatCurrency(value: string | number) {
   return currencyFormatter.format(Number(value));
-}
-
-function formatDate(value: string) {
-  return dateFormatter.format(new Date(value));
 }
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [page, setPage] = useState(1);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingOrders, setLoadingOrders] = useState(true);
-  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
   const showToast = useCallback((type: ToastType, message: string) => {
@@ -148,39 +83,9 @@ function AdminDashboard() {
     }
   }, [showToast]);
 
-  const fetchOrders = useCallback(async (showLoading = true) => {
-    if (showLoading) {
-      setLoadingOrders(true);
-    }
-
-    try {
-      const response = await apiClient.get<AdminOrdersResponse>(`/admin/orders?page=${page}&limit=10`);
-      setOrders(response.data ?? response.orders ?? []);
-      setMeta(
-        response.meta ??
-          (response.pagination
-            ? {
-                totalItems: response.pagination.total ?? 0,
-                totalPages: response.pagination.totalPages ?? 1,
-                currentPage: response.pagination.page ?? page,
-                limit: response.pagination.limit ?? 10,
-              }
-            : null)
-      );
-    } catch {
-      showToast("error", "Không thể tải danh sách đơn hàng.");
-    } finally {
-      setLoadingOrders(false);
-    }
-  }, [page, showToast]);
-
   useEffect(() => {
     void fetchStats();
   }, [fetchStats]);
-
-  useEffect(() => {
-    void fetchOrders();
-  }, [fetchOrders]);
 
   const statusTotal = useMemo(() => {
     if (!stats) {
@@ -193,20 +98,6 @@ function AdminDashboard() {
       stats.orderStatusCounts.DELIVERED
     );
   }, [stats]);
-
-  const updateOrderStatus = async (orderId: number, status: string) => {
-    setUpdatingOrderId(orderId);
-
-    try {
-      await apiClient.put(`/admin/orders/${orderId}/status`, { status });
-      showToast("success", "Đã cập nhật trạng thái đơn hàng.");
-      await Promise.all([fetchOrders(false), fetchStats()]);
-    } catch {
-      showToast("error", "Không thể cập nhật trạng thái đơn hàng.");
-    } finally {
-      setUpdatingOrderId(null);
-    }
-  };
 
   return (
     <div className="admin-shell">
@@ -280,7 +171,7 @@ function AdminDashboard() {
       <main className="admin-main">
         <header className="admin-header">
           <p className="admin-eyebrow">Trung tâm quản trị</p>
-          <h2>Bảng điều khiển Admin</h2>
+          <h2>DUT SHOP</h2>
         </header>
 
         {activeTab === "overview" && (
@@ -347,96 +238,7 @@ function AdminDashboard() {
 
         {activeTab === "orders" && (
           <section className="content-panel">
-            <div className="panel-title">
-              <h3>Quản lý đơn hàng</h3>
-              <p>Cập nhật trạng thái giao hàng và theo dõi các đơn mới nhất.</p>
-            </div>
-
-            {loadingOrders ? (
-              <div className="loading-line">
-                <span className="spinner" />
-                Đang tải danh sách đơn hàng...
-              </div>
-            ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Mã đơn</th>
-                      <th>Phương thức thanh toán</th>
-                      <th>Voucher</th>
-                      <th>Mặt hàng</th>
-                      <th>Tổng tiền</th>
-                      <th>Trạng thái</th>
-                      <th>Cập nhật</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((order) => {
-                      const isUpdating = updatingOrderId === order.id;
-
-                      return (
-                        <tr key={order.id}>
-                          <td>
-                            <strong>#{order.id}</strong>
-                            <span>{formatDate(order.createdAt)}</span>
-                          </td>
-                          <td>{order.paymentMethod}</td>
-                          <td>{order.voucherId ? `#${order.voucherId}` : "Không có"}</td>
-                          <td>{order.items.length} sản phẩm</td>
-                          <td>{formatCurrency(order.total)}</td>
-                          <td>
-                            <span className={`status-pill status-${order.status.toLowerCase()}`}>
-                              {statusLabelByValue[order.status] ?? order.status}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="order-actions">
-                              <select
-                                value={order.status === "COMPLETED" ? "DELIVERED" : order.status}
-                                disabled={isUpdating}
-                                onChange={(event) => {
-                                  void updateOrderStatus(order.id, event.target.value);
-                                }}
-                              >
-                                <option value="PENDING">Chờ xử lý</option>
-                                <option value="PROCESSING">Đang xử lý</option>
-                                <option value="SHIPPED">Đang giao</option>
-                                <option value="DELIVERED">Đã giao</option>
-                                <option value="CANCELLED">Đã hủy</option>
-                              </select>
-                              <button
-                                type="button"
-                                disabled={isUpdating}
-                                className="confirm-button"
-                                onClick={() => {
-                                  void updateOrderStatus(order.id, "DELIVERED");
-                                }}
-                              >
-                                {isUpdating && <span className="spinner small" />}
-                                Xác nhận giao hàng
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-
-                {orders.length === 0 && (
-                  <p className="empty-state">Chưa có đơn hàng nào.</p>
-                )}
-              </div>
-            )}
-
-            {!loadingOrders && (
-              <Pagination
-                currentPage={page}
-                totalPages={meta?.totalPages || 1}
-                onPageChange={(nextPage) => setPage(nextPage)}
-              />
-            )}
+            <OrderManagement/>
           </section>
         )}
 

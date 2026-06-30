@@ -20,6 +20,7 @@ interface AdminOrder {
   voucherId?: number | null;
   total: string | number;
   status: string;
+  paymentStatus: string;
   paymentMethod: string;
   createdAt: string;
   items: OrderItem[];
@@ -66,6 +67,8 @@ const statusLabels: Record<string, string> = {
   COMPLETED: "Thành công",
   DELIVERED: "Thành công",
   CANCELLED: "Đã hủy",
+  FAILED: "Thất bại",
+  REFUNDED: "Đã hoàn tiền",
 };
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
@@ -148,15 +151,13 @@ function OrderManagement() {
     return orders.filter((order) => normalizeStatus(order.status) === activeStatus);
   }, [activeStatus, orders]);
 
-  const updateOrderStatus = async (orderId: number, status: "SHIPPED" | "DELIVERED" | "CANCELLED") => {
+  const updateOrderStatus = async (orderId: number, status: string) => {
     setUpdatingOrderId(orderId);
 
     try {
-      await requestApi(`/admin/orders/${orderId}/status`, {
-        method: "PUT",
-        body: JSON.stringify({ status }),
-      });
+      await apiClient.put(`/admin/orders/${orderId}/status`, { status });
       showToast("success", "Đã cập nhật trạng thái đơn hàng.");
+      // await Promise.all([fetchOrders(), fetchStats()]);
       await fetchOrders();
     } catch {
       showToast("error", "Không thể cập nhật trạng thái đơn hàng.");
@@ -220,7 +221,8 @@ function OrderManagement() {
                   <th>Phương thức thanh toán</th>
                   <th>Sản phẩm</th>
                   <th>Tổng tiền</th>
-                  <th>Trạng thái</th>
+                  <th>Trạng thái đơn hàng</th>
+                  <th>Trạng thái thanh toán</th>
                   <th>Thao tác nhanh</th>
                 </tr>
               </thead>
@@ -253,7 +255,12 @@ function OrderManagement() {
                         </span>
                       </td>
                       <td>
-                        <div className="order-management-actions">
+                        <span className={`order-management-status status-${order.paymentStatus.toLowerCase()}`}>
+                          {statusLabels[order.paymentStatus] ?? order.paymentStatus}
+                        </span>
+                      </td>
+                      <td>
+                        {/* <div className="order-management-actions">
                           {normalizedStatus === "PROCESSING" && (
                             <button
                               type="button"
@@ -287,6 +294,21 @@ function OrderManagement() {
                             {isUpdating ? <span className="order-management-spinner small" /> : null}
                             ❌ Hủy đơn
                           </button>
+                        </div> */}
+                        <div className="order-actions">
+                          <select
+                            value={order.status === "COMPLETED" ? "SHIPPED" : order.status}
+                            disabled={isUpdating}
+                            onChange={(event) => {
+                              void updateOrderStatus(order.id, event.target.value);
+                            }}
+                          >
+                            <option value="PENDING">Chờ xử lý</option>
+                            <option value="PROCESSING">Đang xử lý</option>
+                            <option value="SHIPPED">Đã giao</option>
+                            <option value="CANCELLED">Đã hủy</option>
+                            <option value="COMPLETED">Đã hoàn thành</option>
+                          </select>
                         </div>
                       </td>
                     </tr>

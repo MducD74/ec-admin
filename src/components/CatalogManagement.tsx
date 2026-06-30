@@ -8,6 +8,7 @@ type ToastType = "success" | "error";
 interface Category {
   id: number;
   name: string;
+  parentId?: number | null;
   children?: Category[];
 }
 
@@ -60,6 +61,7 @@ interface CategoriesResponse {
 interface Brand {
   id: number;
   name: string;
+  description?: string | null;
   logoUrl?: string | null;
 }
 
@@ -70,10 +72,23 @@ interface BrandsResponse {
 
 interface ProductFormState {
   name: string;
+  description: string;
+  sku: string;
   price: string;
   brandId: string;
   categoryId: string;
-  initialStock: string;
+  quantity: string;
+}
+
+interface BrandFormState {
+  name: string;
+  description: string;
+  logoUrl: string;
+}
+
+interface CategoryFormState {
+  name: string;
+  parentId: string;
 }
 
 interface ToastState {
@@ -83,10 +98,23 @@ interface ToastState {
 
 const initialFormState: ProductFormState = {
   name: "",
+  description: "",
+  sku: "",
   price: "",
   brandId: "",
   categoryId: "",
-  initialStock: "",
+  quantity: "",
+};
+
+const initialBrandFormState: BrandFormState = {
+  name: "",
+  description: "",
+  logoUrl: "",
+};
+
+const initialCategoryFormState: CategoryFormState = {
+  name: "",
+  parentId: "",
 };
 
 const currencyFormatter = new Intl.NumberFormat("vi-VN", {
@@ -94,10 +122,6 @@ const currencyFormatter = new Intl.NumberFormat("vi-VN", {
   currency: "VND",
   maximumFractionDigits: 0,
 });
-
-async function requestApi<T>(path: string, init?: RequestInit): Promise<T> {
-  return apiClient.request<T>(path, init);
-}
 
 function formatCurrency(value: string | number) {
   return currencyFormatter.format(Number(value));
@@ -131,8 +155,16 @@ function CatalogManagement() {
   const [formState, setFormState] = useState<ProductFormState>(initialFormState);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+  // const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+
+  const [isBrandFormOpen, setIsBrandFormOpen] = useState(false);
+  const [brandFormState, setBrandFormState] = useState<BrandFormState>(initialBrandFormState);
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
+
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
+  const [categoryFormState, setCategoryFormState] = useState<CategoryFormState>(initialCategoryFormState);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
 
   const flatCategories = useMemo(() => flattenCategories(categories), [categories]);
 
@@ -145,7 +177,7 @@ function CatalogManagement() {
     setIsLoadingProducts(true);
 
     try {
-      const response = await requestApi<ProductsResponse>(`/products?page=${page}&limit=10`);
+      const response = await apiClient.get<ProductsResponse>(`/products?page=${page}&limit=10`);
       setProducts(getProducts(response));
       setMeta(
         response.meta ??
@@ -167,7 +199,7 @@ function CatalogManagement() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await requestApi<CategoriesResponse>("/categories");
+      const response = await apiClient.get<CategoriesResponse>("/admin/categories");
       setCategories(response.data ?? response.categories ?? []);
     } catch {
       showToast("error", "Không thể tải danh mục sản phẩm.");
@@ -176,7 +208,7 @@ function CatalogManagement() {
 
   const fetchBrands = useCallback(async () => {
     try {
-      const response = await requestApi<BrandsResponse>("/brands");
+      const response = await apiClient.get<BrandsResponse>("/admin/brands");
       setBrands(getBrands(response));
     } catch {
       showToast("error", "Không thể tải danh sách thương hiệu.");
@@ -201,15 +233,14 @@ function CatalogManagement() {
     setIsCreating(true);
 
     try {
-      await requestApi("/admin/products", {
-        method: "POST",
-        body: JSON.stringify({
-          name: formState.name.trim(),
-          price: Number(formState.price),
-          brandId: formState.brandId ? Number(formState.brandId) : null,
-          categoryId: formState.categoryId ? Number(formState.categoryId) : null,
-          initialStock: Number(formState.initialStock || 0),
-        }),
+      await apiClient.post("/admin/products", {
+        name: formState.name.trim(),
+        description: formState.description.trim(),
+        sku: formState.sku.trim(),
+        price: Number(formState.price),
+        brandId: formState.brandId ? Number(formState.brandId) : null,
+        categoryId: formState.categoryId ? Number(formState.categoryId) : null,
+        quantity: Number(formState.quantity || 0),
       });
       setFormState(initialFormState);
       showToast("success", "Đã thêm sản phẩm mới.");
@@ -221,27 +252,88 @@ function CatalogManagement() {
     }
   };
 
-  const deleteProduct = async (productId: number) => {
-    const confirmed = window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này?");
+  const updateBrandFormField = (field: keyof BrandFormState, value: string) => {
+    setBrandFormState((currentState) => ({
+      ...currentState,
+      [field]: value,
+    }));
+  };
 
-    if (!confirmed) {
+  const createBrand = async () => {
+    if (!brandFormState.name.trim()) {
+      showToast("error", "Vui lòng nhập tên thương hiệu.");
       return;
     }
 
-    setDeletingProductId(productId);
+    setIsCreatingBrand(true);
 
     try {
-      await requestApi(`/admin/products/${productId}`, {
-        method: "DELETE",
+      await apiClient.post("/admin/brands", {
+        name: brandFormState.name.trim(),
+        description: brandFormState.description.trim(),
+        logoUrl: brandFormState.logoUrl.trim() || null,
       });
-      showToast("success", "Đã xóa sản phẩm.");
-      await fetchProducts();
+      setBrandFormState(initialBrandFormState);
+      setIsBrandFormOpen(false);
+      showToast("success", "Đã thêm thương hiệu mới.");
+      await fetchBrands();
     } catch {
-      showToast("error", "Không thể xóa sản phẩm.");
+      showToast("error", "Không thể thêm thương hiệu mới.");
     } finally {
-      setDeletingProductId(null);
+      setIsCreatingBrand(false);
     }
   };
+
+  const updateCategoryFormField = (field: keyof CategoryFormState, value: string) => {
+    setCategoryFormState((currentState) => ({
+      ...currentState,
+      [field]: value,
+    }));
+  };
+
+  const createCategory = async () => {
+    if (!categoryFormState.name.trim()) {
+      showToast("error", "Vui lòng nhập tên danh mục.");
+      return;
+    }
+
+    setIsCreatingCategory(true);
+
+    try {
+      await apiClient.post("/admin/categories", {
+        name: categoryFormState.name.trim(),
+        parentId: categoryFormState.parentId ? Number(categoryFormState.parentId) : null,
+      });
+      setCategoryFormState(initialCategoryFormState);
+      setIsCategoryFormOpen(false);
+      showToast("success", "Đã thêm danh mục mới.");
+      await fetchCategories();
+    } catch {
+      showToast("error", "Không thể thêm danh mục mới.");
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
+  // const deleteProduct = async (productId: number) => {
+  //   const confirmed = window.confirm("Bạn có chắc chắn muốn xóa sản phẩm này?");
+
+  //   if (!confirmed) {
+  //     return;
+  //   }
+
+  //   setDeletingProductId(productId);
+
+  //   try {
+  //     await apiClient.delete(`/admin/products/${productId}`);
+  //     showToast("success", "Đã xóa sản phẩm.");
+  //     await fetchProducts();
+  //   } catch {
+  //     showToast("error", "Không thể xóa sản phẩm.");
+  //   } finally {
+  //     setDeletingProductId(null);
+  //   }
+  // };
 
   return (
     <section className="catalog-management">
@@ -255,11 +347,11 @@ function CatalogManagement() {
 
       <div className="catalog-management-header">
         <div>
-          <p>Quản trị danh mục</p>
-          <h2>Quản lý sản phẩm</h2>
+          {/* <p>Quản trị danh mục</p>
+          <h2>Quản lý sản phẩm</h2> */}
         </div>
         <button type="button" className="catalog-management-refresh" onClick={() => void fetchProducts()}>
-          Tải lại sản phẩm
+          Tải lại
         </button>
       </div>
 
@@ -281,6 +373,25 @@ function CatalogManagement() {
           </label>
 
           <label>
+            Mô tả
+            <input
+              value={formState.description}
+              onChange={(event) => updateFormField("description", event.target.value)}
+              placeholder="Mô tả ngắn về sản phẩm"
+            />
+          </label>
+
+          <label>
+            Mã SKU
+            <input
+              required
+              value={formState.sku}
+              onChange={(event) => updateFormField("sku", event.target.value)}
+              placeholder="Ví dụ: IP16P-256-BLK"
+            />
+          </label>
+
+          <label>
             Giá bán
             <input
               required
@@ -293,7 +404,16 @@ function CatalogManagement() {
           </label>
 
           <label>
-            Thương hiệu
+            <span className="catalog-management-label-row">
+              Thương hiệu
+              <button
+                type="button"
+                className="catalog-management-inline-toggle"
+                onClick={() => setIsBrandFormOpen((current) => !current)}
+              >
+                {isBrandFormOpen ? "Đóng" : "+ Thêm thương hiệu"}
+              </button>
+            </span>
             <select
               value={formState.brandId}
               onChange={(event) => updateFormField("brandId", event.target.value)}
@@ -307,8 +427,57 @@ function CatalogManagement() {
             </select>
           </label>
 
+          {isBrandFormOpen && (
+            <div className="catalog-management-inline-form">
+              <div>
+                <div className="catalog-management-inline-form-grid">
+                  <label>
+                    Tên thương hiệu
+                    <input
+                      required
+                      value={brandFormState.name}
+                      onChange={(event) => updateBrandFormField("name", event.target.value)}
+                      placeholder="Ví dụ: Apple"
+                    />
+                  </label>
+                  <label>
+                    Mô tả
+                    <input
+                      value={brandFormState.description}
+                      onChange={(event) => updateBrandFormField("description", event.target.value)}
+                      placeholder="Mô tả ngắn"
+                    />
+                  </label>
+                  <label>
+                    Logo URL
+                    <input
+                      value={brandFormState.logoUrl}
+                      onChange={(event) => updateBrandFormField("logoUrl", event.target.value)}
+                      placeholder="https://..."
+                    />
+                  </label>
+                </div>
+                <div className="catalog-management-form-actions">
+                  <button type="button" disabled={isCreatingBrand} onClick={() => void createBrand()}>
+                    {isCreatingBrand && <span className="catalog-management-spinner small" />}
+                    Lưu thương hiệu
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <label>
-            Danh mục
+            <span className="catalog-management-label-row">
+              Danh mục
+              <button
+                type="button"
+                className="catalog-management-inline-toggle"
+                onClick={() => setIsCategoryFormOpen((current) => !current)}
+              >
+                {isCategoryFormOpen ? "Đóng" : "+ Thêm danh mục"}
+              </button>
+            </span>
             <select
               value={formState.categoryId}
               onChange={(event) => updateFormField("categoryId", event.target.value)}
@@ -322,14 +491,52 @@ function CatalogManagement() {
             </select>
           </label>
 
+          {isCategoryFormOpen && (
+            <div className="catalog-management-inline-form">
+              <div>
+                <div className="catalog-management-inline-form-grid">
+                  <label>
+                    Tên danh mục
+                    <input
+                      required
+                      value={categoryFormState.name}
+                      onChange={(event) => updateCategoryFormField("name", event.target.value)}
+                      placeholder="Ví dụ: Điện thoại"
+                    />
+                  </label>
+                  <label>
+                    Danh mục cha
+                    <select
+                      value={categoryFormState.parentId}
+                      onChange={(event) => updateCategoryFormField("parentId", event.target.value)}
+                    >
+                      <option value="">Không có danh mục cha</option>
+                      {flatCategories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="catalog-management-form-actions">
+                  <button type="button" disabled={isCreatingCategory} onClick={() => void createCategory()}>
+                    {isCreatingCategory && <span className="catalog-management-spinner small" />}
+                    Lưu danh mục
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <label>
             Số lượng kho ban đầu
             <input
               required
               min="0"
               type="number"
-              value={formState.initialStock}
-              onChange={(event) => updateFormField("initialStock", event.target.value)}
+              value={formState.quantity}
+              onChange={(event) => updateFormField("quantity", event.target.value)}
               placeholder="Ví dụ: 20"
             />
           </label>
@@ -360,12 +567,12 @@ function CatalogManagement() {
                   <th>Thương hiệu</th>
                   <th>Giá bán</th>
                   <th>Tồn kho</th>
-                  <th>Thao tác</th>
+                  {/* <th>Thao tác</th> */}
                 </tr>
               </thead>
               <tbody>
                 {products.map((product) => {
-                  const isDeleting = deletingProductId === product.id;
+                  // const isDeleting = deletingProductId === product.id;
 
                   return (
                     <tr key={product.id}>
@@ -387,7 +594,7 @@ function CatalogManagement() {
                       <td>{product.brand?.name ?? "Chưa có"}</td>
                       <td className="catalog-management-money">{formatCurrency(product.price)}</td>
                       <td>{getAvailableStock(product)}</td>
-                      <td>
+                      {/* <td>
                         <button
                           type="button"
                           className="catalog-management-delete"
@@ -397,7 +604,7 @@ function CatalogManagement() {
                           {isDeleting && <span className="catalog-management-spinner small" />}
                           Xóa
                         </button>
-                      </td>
+                      </td> */}
                     </tr>
                   );
                 })}
@@ -528,6 +735,45 @@ const styles = `
   .catalog-management-form select:focus {
     border-color: #0f172a;
     box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+  }
+
+  .catalog-management-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .catalog-management-inline-toggle {
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 900;
+    padding: 0;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .catalog-management-inline-form {
+    grid-column: 1 / -1;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+    padding: 16px;
+  }
+
+  .catalog-management-inline-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  .catalog-management-inline-form .catalog-management-form-actions {
+    justify-content: flex-start;
   }
 
   .catalog-management-form-actions {
