@@ -42,7 +42,7 @@ const QUEUE_BOARD_URL = "/api/v1/monitor";
 const tabs: Array<{ id: ActiveTab; label: string }> = [
   { id: "overview", label: "Tổng quan" },
   { id: "orders", label: "Đơn hàng" },
-  { id: "vouchers", label: "Voucher" },
+  // { id: "vouchers", label: "Voucher" },
   { id: "ai-control", label: "Cấu hình AI" },
   { id: "catalog", label: "Danh mục sản phẩm" },
   // { id: "inventory", label: "Tồn kho biến thể" },
